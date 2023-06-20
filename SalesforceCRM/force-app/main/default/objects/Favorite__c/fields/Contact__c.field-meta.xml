@@ -8,6 +8,6 @@
     <relationshipLabel>Favorites</relationshipLabel>
     <relationshipName>Favorites</relationshipName>
     <required>false</required>
-    <trackTrending>false</trackTrending>
+    <trackTrending>true</trackTrending>
     <type>Lookup</type>
 </CustomField>

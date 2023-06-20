@@ -1,31 +1,123 @@
-# Salesforce Build Pipeline
+trigger:
+  branches:
+     include:
+     - dev
+  paths:
+     exclude:
+     - README.md
+     - azure-pipelines.yml
+     - qa-pipelines.yml     
+     - .gitignore
+     - .forceignore
+     - .eslintignore
+     - .prettierignore
+     - .prettierrc
+     -  package.json
+     - .vscode/**
+     - .husky/*
+     -  manifest/*
+     - sfdx-project.json
+     - jest.config.js
+pr: none
 
- trigger: none
+pool:
+  vmImage: ubuntu-latest
 
- pr:
- - dev
-
- jobs:
- - job: Validate
- variables:
- - group: sfdx-org-dev
-
- steps:
-     - task: UseNode@1
-     displayName: 'Use Node.js 16.15.0'
-     inputs:
-         version: '16.15.0'
-     - bash: 
+jobs:
+  - job: dev
+    steps:
+    - checkout: self
+      persistCredentials: true
+    - task: Bash@3
+      displayName: Install SFDX CLI
+      inputs:
+        targetType: 'inline'
+        script: |
          npm install sfdx-cli --global
-     displayName: Install Salesforce CLI
-     - task: DownloadSecureFile@1
-     name: jwtKey
-     displayName: 'Download Server JWT Key'
-     inputs:
-         secureFile: 'server.key'
-     - bash: 
-         sfdx force:auth:jwt:grant --clientid $(Clientid) --jwtkeyfile $(jwtKey.secureFilePath) --username $(SalesforceUserName) --instanceurl $(InstanceUrl) -a $(OrgAlias)
-     displayName: Authorize salesforce org
-     - bash: 
-         sfdx force:source:deploy -l RunLocalTests -c -x manifest/package.xml -u $(OrgAlias) -w 10
-     displayName: Run Validation on source code
+         echo 'y' | sfdx plugins:install sfdx-git-delta      
+    - task: DownloadSecureFile@1
+      condition: succeeded()
+      displayName: Get Environment Configurations
+      name: 'serverKey'
+      inputs:
+        secureFile: 'server.key' 
+    - task: Bash@3
+      condition: succeeded()
+      displayName: Syncing dev Branch
+      inputs:
+        targetType: 'inline'
+        script: |
+            echo "---- merging Master branch to dev ----"
+            git config --global merge.ours.driver true
+            git checkout release/dev
+            git config --global user.email "garvit.dhasmana@outlook.com"
+            git config --global user.name "Garvit Dhasmana"
+            git merge origin/release/Master
+            echo '----- The following files have changed since last merge  -----'
+            git --no-pager diff --name-status $(deltaStartTag)   $(deltaToTag)
+            echo '----------------------------------------------------------------------------'
+    - task: Bash@3
+      condition: succeeded()
+      displayName: Gather Delta Changeset
+      inputs:
+        targetType: 'inline'
+        script: |
+          mkdir deltaChanges
+          mkdir readyToDeploy
+          sfdx sgd:source:delta --from $(deltaStartTag) --to $(deltaToTag) --output deltaChanges/ --generate-delta
+          echo '----- Generating Delta Package for deployment   -----'
+          cat ./deltaChanges/package/package.xml
+          if grep -q '<types>' ./deltaChanges/package/package.xml ; then
+            sfdx force:source:convert -r deltaChanges -d readyToDeploy
+            echo '----- Checking readyToDeploy components  -----'
+            ls readyToDeploy
+            cat ./readyToDeploy/package.xml
+          else 
+            echo "---- No changes to deploy ----"
+          fi
+          
+    - task: Bash@3
+      condition: succeeded()
+      displayName: Authorize Target Salesforce Org 
+      inputs:
+          targetType: 'inline'
+          script: |
+            if grep -q '<types>' ./deltaChanges/package/package.xml ; then
+              echo "---- Authorizing Target Org Sandbox ----"
+              sfdx force:auth:jwt:grant --clientid $(sfClientId) --jwtkeyfile $(serverKey.secureFilePath) --username $(sfDeploymentUser) --instanceurl $(sfTargetEndpoint) -a targetOrg
+            else
+              echo "---- No changes to deploy ----"
+            fi              
+    - task: Bash@3
+      condition: succeeded()
+      displayName: Run Unit Tests
+      inputs:
+        targetType: 'inline'
+        script: |
+          if grep -q '<types>' ./deltaChanges/package/package.xml ; then
+            echo "---- Validating Detlta Changeset package ----"
+            sfdx force:mdapi:deploy --deploydir=readyToDeploy -c -l RunLocalTests -w 15 -u $(sfDeploymentUser)
+          else
+            echo "---- No changes to deploy ----"
+          fi
+    - task: Bash@3
+      condition: succeeded()
+      displayName: final push to remote dev Branch
+      inputs:
+        targetType: 'inline'
+        script: |
+            git push origin release/dev
+            echo '----------------------------------------------------------------------------'          
+    - task: Bash@3
+      condition: succeeded()
+      displayName: Deploying the Metadata Components
+      inputs:
+        targetType: 'inline'
+        script: |
+          if grep -q '<types>' ./deltaChanges/package/package.xml ; then
+            echo "---- Validating Detlta Changeset package ----"
+            sfdx force:mdapi:deploy --deploydir=readyToDeploy  -w 15 -u $(sfDeploymentUser)
+          else
+            echo "---- No changes to deploy ----"
+          fi          
+
