@@ -50,7 +50,7 @@
     <enableReports>false</enableReports>
     <enableSearch>false</enableSearch>
     <enableSharing>true</enableSharing>
-    <enableStreamingApi>true</enableStreamingApi>
+    <enableStreamingApi>false</enableStreamingApi>
     <externalSharingModel>Private</externalSharingModel>
     <label>Offer</label>
     <nameField>
