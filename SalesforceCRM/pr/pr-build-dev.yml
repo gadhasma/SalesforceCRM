@@ -29,5 +29,6 @@ jobs:
         displayName: Authorize Salesforce org
 
       - bash: |
+          cd $(System.DefaultWorkingDirectory)
           sfdx force:source:deploy -l RunLocalTests -c -x manifest/package.xml -u $(OrgAlias) -w 10
         displayName: Run Validation on source code
