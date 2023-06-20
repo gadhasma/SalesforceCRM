@@ -3,7 +3,7 @@
     <fullName>Clock_in_Time__c</fullName>
     <externalId>false</externalId>
     <label>Clock-in Time</label>
-    <required>false</required>
-    <trackTrending>false</trackTrending>
+    <required>true</required>
+    <trackTrending>true</trackTrending>
     <type>DateTime</type>
 </CustomField>
