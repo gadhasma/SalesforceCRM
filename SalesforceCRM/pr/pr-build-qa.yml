@@ -43,13 +43,13 @@ jobs:
         secureFile: 'server.key' 
     - task: Bash@3
       condition: succeeded()
-      displayName: Syncing qa Branch
+      displayName: Syncing dev Branch
       inputs:
         targetType: 'inline'
         script: |
-            echo "---- merging development branch to qa ----"
+            echo "---- merging Master branch to dev ----"
             git config --global merge.ours.driver true
-            git checkout release/qa
+            git checkout release/dev
             git config --global user.email "garvit.dhasmana@outlook.com"
             git config --global user.name "Garvit Dhasmana"
             git merge origin/release/Master
