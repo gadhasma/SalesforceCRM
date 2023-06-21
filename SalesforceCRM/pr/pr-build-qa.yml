@@ -6,7 +6,7 @@ trigger:
      exclude:
      - README.md
      - azure-pipelines.yml
-     - qa-pipelines.yml     
+     - dev-pipelines.yml     
      - .gitignore
      - .forceignore
      - .eslintignore
